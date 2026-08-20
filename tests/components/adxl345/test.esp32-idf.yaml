@@ -1,0 +1,19 @@
+# Classic ESP32 (Xtensa) / ESP-IDF — covers Xtensa + the IDF framework.
+# Same free pins as the classic ESP32 Arduino variant.
+substitutions:
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+  miso_pin: GPIO19
+  cs_pin: GPIO5
+
+esphome:
+  name: adxl345-test-esp32-idf
+
+esp32:
+  board: esp32dev
+  variant: esp32
+  framework:
+    type: esp-idf
+
+packages:
+  adxl345: !include common.yaml

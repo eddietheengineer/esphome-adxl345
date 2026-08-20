@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  # Nightly build to catch breakage from ESPHome / toolchain updates.
+  schedule:
+    - cron: "0 7 * * *" # Every day at 07:00 UTC
+
+# Cancel in-progress runs for the same branch/PR to keep the queue short.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Fast config validation: run `esphome config` on every test file using the
+  # official ESPHome image. Catches schema / YAML / substitution errors in
+  # seconds without a full firmware build.
+  # ---------------------------------------------------------------------------
+  config:
+    name: Config validation (${{ matrix.yaml-file }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        yaml-file:
+          - tests/components/adxl345/test.esp32-c3-ard.yaml
+          - tests/components/adxl345/test.esp32-c3-idf.yaml
+          - tests/components/adxl345/test.esp32-ard.yaml
+          - tests/components/adxl345/test.esp32-idf.yaml
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate configuration
+        run: |
+          docker run --rm \
+            --workdir /github/workspace \
+            -v "$GITHUB_WORKSPACE:/github/workspace" \
+            ghcr.io/esphome/esphome:stable \
+            config "${{ matrix.yaml-file }}"
+
+  # ---------------------------------------------------------------------------
+  # Full firmware compilation: run `esphome compile` on every test file via
+  # the official esphome/build-action (runs in the ESPHome container). This is
+  # the real "does it build" gate on every commit to main.
+  # ---------------------------------------------------------------------------
+  compile:
+    name: Compile (${{ matrix.yaml-file }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        yaml-file:
+          - tests/components/adxl345/test.esp32-c3-ard.yaml
+          - tests/components/adxl345/test.esp32-c3-idf.yaml
+          - tests/components/adxl345/test.esp32-ard.yaml
+          - tests/components/adxl345/test.esp32-idf.yaml
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build firmware
+        uses: esphome/build-action@v8.0.0
+        with:
+          yaml-file: ${{ matrix.yaml-file }}
+          version: stable

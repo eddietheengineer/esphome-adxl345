@@ -1,0 +1,124 @@
+# Shared ADXL345 test configuration.
+#
+# Included as a named package by each test.<platform>.yaml file. The
+# `external_components` entry loads the component from the repo's
+# components/ folder (three levels up from this file).
+#
+# The four SPI/CS pins are parameterised with substitutions
+# (clk_pin / mosi_pin / miso_pin / cs_pin) so each per-platform test file
+# can supply pins that are valid for that board. This file is otherwise
+# platform-agnostic: it defines the SPI bus, the ADXL345 component, and
+# every sensor / binary-sensor the component exposes.
+
+external_components:
+  - source:
+      type: local
+      path: ../../../components
+
+spi:
+  id: spi_bus
+  clk_pin: ${clk_pin}
+  mosi_pin: ${mosi_pin}
+  miso_pin: ${miso_pin}
+
+adxl345:
+  id: adxl345_sensor
+  name: ADXL345
+  cs_pin: ${cs_pin}
+  spi_id: spi_bus
+  spi_mode: MODE3
+  data_rate: 5 MHz
+  output_rate: 100 Hz
+  range: 4 g
+  full_resolution: true
+  low_power: false
+  # Exercise the interrupt / threshold registers so the binary-sensor
+  # callbacks and the INT_SOURCE polling path are compiled.
+  threshold_tap: 40
+  tap_duration: 200
+  tap_latency: 50
+  tap_window: 200
+  threshold_activity: 30
+  threshold_inactivity: 20
+  time_inactivity: 10
+  threshold_free_fall: 7
+  time_free_fall: 20
+  int_enable: 0xFF
+  int_map: 0x00
+  offset_x: 0
+  offset_y: 0
+  offset_z: 0
+
+sensor:
+  - platform: adxl345
+    name: "ADXL345 X Acceleration"
+    axis: x
+    adxl345_id: adxl345_sensor
+    id: accel_x
+
+  - platform: adxl345
+    name: "ADXL345 Y Acceleration"
+    axis: y
+    adxl345_id: adxl345_sensor
+    id: accel_y
+
+  - platform: adxl345
+    name: "ADXL345 Z Acceleration"
+    axis: z
+    adxl345_id: adxl345_sensor
+    id: accel_z
+
+  - platform: adxl345
+    name: "ADXL345 Magnitude"
+    axis: magnitude
+    adxl345_id: adxl345_sensor
+    id: accel_mag
+
+  - platform: adxl345
+    name: "ADXL345 Tilt X"
+    axis: tilt_x
+    adxl345_id: adxl345_sensor
+    id: tilt_x
+
+  - platform: adxl345
+    name: "ADXL345 Tilt Y"
+    axis: tilt_y
+    adxl345_id: adxl345_sensor
+    id: tilt_y
+
+  - platform: adxl345
+    name: "ADXL345 Tilt Z"
+    axis: tilt_z
+    adxl345_id: adxl345_sensor
+    id: tilt_z
+
+binary_sensor:
+  - platform: adxl345
+    name: "ADXL345 Data Ready"
+    source: data_ready
+    adxl345_id: adxl345_sensor
+
+  - platform: adxl345
+    name: "ADXL345 Single Tap"
+    source: single_tap
+    adxl345_id: adxl345_sensor
+
+  - platform: adxl345
+    name: "ADXL345 Double Tap"
+    source: double_tap
+    adxl345_id: adxl345_sensor
+
+  - platform: adxl345
+    name: "ADXL345 Activity"
+    source: activity
+    adxl345_id: adxl345_sensor
+
+  - platform: adxl345
+    name: "ADXL345 Inactivity"
+    source: inactivity
+    adxl345_id: adxl345_sensor
+
+  - platform: adxl345
+    name: "ADXL345 Free Fall"
+    source: free_fall
+    adxl345_id: adxl345_sensor

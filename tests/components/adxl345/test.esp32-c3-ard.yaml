@@ -1,0 +1,19 @@
+# ESP32-C3 (RISC-V) / Arduino — matches the Seeed XIAO ESP32-C3 target.
+# Pins are the XIAO C3 SPI mapping: D8/D9/D10/D1 -> GPIO8/9/10/3.
+substitutions:
+  clk_pin: GPIO8
+  mosi_pin: GPIO10
+  miso_pin: GPIO9
+  cs_pin: GPIO3
+
+esphome:
+  name: adxl345-test-c3-ard
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
+  framework:
+    type: arduino
+
+packages:
+  adxl345: !include common.yaml

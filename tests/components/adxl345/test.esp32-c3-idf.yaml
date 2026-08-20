@@ -1,0 +1,19 @@
+# ESP32-C3 (RISC-V) / ESP-IDF — second framework for the C3 architecture.
+# Same XIAO C3 SPI pins as the Arduino variant.
+substitutions:
+  clk_pin: GPIO8
+  mosi_pin: GPIO10
+  miso_pin: GPIO9
+  cs_pin: GPIO3
+
+esphome:
+  name: adxl345-test-c3-idf
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
+  framework:
+    type: esp-idf
+
+packages:
+  adxl345: !include common.yaml
