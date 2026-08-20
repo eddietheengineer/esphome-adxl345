@@ -1,0 +1,146 @@
+# =============================================================================
+# ADXL345 3-axis accelerometer on a Seeed XIAO ESP32-C3 (SPI mode)
+# =============================================================================
+#
+# Wiring (XIAO ESP32-C3 -> ADXL345):
+#   3V3  -> VDD (3.3V)
+#   GND  -> GND
+#   D8   -> SCLK   (GPIO8)
+#   D9   -> MISO   (GPIO9)
+#   D10  -> MOSI   (GPIO10)
+#   D1   -> CS     (GPIO3)
+#
+# The ADXL345 requires SPI MODE3 (CPOL=1, CPHA=1) and a max clock of 5 MHz.
+# =============================================================================
+
+esphome:
+  name: adxl345-xiao-c3
+
+# Load the ADXL345 component from the local components folder.
+external_components:
+  - source:
+      type: local
+      path: ./components
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
+  framework:
+    type: arduino
+
+# Enable logging so you can see the ADXL345 setup messages.
+logger:
+
+# Enable the SPI bus.
+spi:
+  id: spi_bus
+  clk_pin: GPIO8      # XIAO D8  -> SCLK
+  mosi_pin: GPIO10   # XIAO D10 -> MOSI
+  miso_pin: GPIO9    # XIAO D9  -> MISO
+
+# The ADXL345 component.
+adxl345:
+  id: adxl345_sensor
+  name: ADXL345
+  cs_pin: GPIO3       # XIAO D1 -> CS
+  spi_id: spi_bus
+  spi_mode: MODE3     # ADXL345 requires CPOL=1, CPHA=1
+  data_rate: 5 MHz    # SPI bus clock (max 5 MHz for ADXL345)
+  output_rate: 100 Hz # sensor output data rate (BW_RATE register)
+  range: 4 g          # full-scale range (DATA_FORMAT range bits)
+  full_resolution: true
+  low_power: false
+
+# -----------------------------------------------------------------------------
+# Acceleration sensors (in g).
+sensor:
+  - platform: adxl345
+    name: "ADXL345 X Acceleration"
+    axis: x
+    adxl345_id: adxl345_sensor
+    id: accel_x
+
+  - platform: adxl345
+    name: "ADXL345 Y Acceleration"
+    axis: y
+    adxl345_id: adxl345_sensor
+    id: accel_y
+
+  - platform: adxl345
+    name: "ADXL345 Z Acceleration"
+    axis: z
+    adxl345_id: adxl345_sensor
+    id: accel_z
+
+  - platform: adxl345
+    name: "ADXL345 Magnitude"
+    axis: magnitude
+    adxl345_id: adxl345_sensor
+    id: accel_mag
+
+  # Tilt sensors (in degrees), derived from the static gravity vector.
+  - platform: adxl345
+    name: "ADXL345 Tilt X"
+    axis: tilt_x
+    adxl345_id: adxl345_sensor
+    id: tilt_x
+
+  - platform: adxl345
+    name: "ADXL345 Tilt Y"
+    axis: tilt_y
+    adxl345_id: adxl345_sensor
+    id: tilt_y
+
+  - platform: adxl345
+    name: "ADXL345 Tilt Z"
+    axis: tilt_z
+    adxl345_id: adxl345_sensor
+    id: tilt_z
+
+# -----------------------------------------------------------------------------
+# Event / interrupt binary sensors.
+#
+# For tap / activity / inactivity / free-fall to fire, configure the
+# corresponding threshold registers on the adxl345 component above, e.g.:
+#
+#   adxl345:
+#     ...
+#     threshold_tap: 40        # ~2.5 g tap threshold
+#     tap_duration: 200       # ~125 ms
+#     tap_latency: 50         # ~62 ms
+#     tap_window: 200        # ~250 ms
+#     threshold_activity: 30
+#     threshold_free_fall: 7  # ~440 m*g*
+#     time_free_fall: 20      # ~100 ms
+#     int_enable: 0xFF        # enable all interrupt sources
+# -----------------------------------------------------------------------------
+binary_sensor:
+  - platform: adxl345
+    name: "ADXL345 Data Ready"
+    source: data_ready
+    adxl345_id: adxl345_sensor
+
+  - platform: adxl345
+    name: "ADXL345 Single Tap"
+    source: single_tap
+    adxl345_id: adxl345_sensor
+
+  - platform: adxl345
+    name: "ADXL345 Double Tap"
+    source: double_tap
+    adxl345_id: adxl345_sensor
+
+  - platform: adxl345
+    name: "ADXL345 Activity"
+    source: activity
+    adxl345_id: adxl345_sensor
+
+  - platform: adxl345
+    name: "ADXL345 Inactivity"
+    source: inactivity
+    adxl345_id: adxl345_sensor
+
+  - platform: adxl345
+    name: "ADXL345 Free Fall"
+    source: free_fall
+    adxl345_id: adxl345_sensor
