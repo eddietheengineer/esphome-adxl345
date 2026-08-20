@@ -6,51 +6,68 @@ A 3-axis accelerometer driver for the [Analog Devices ADXL345](https://www.analo
 
 | Item | Notes |
 |------|-------|
-| **Sensor** | ADXL345 (LGA-14 package) or breakout board |
-| **MCU** | Any ESP32 / ESP8266 / RP2040 with SPI. Example below uses the **Seeed XIAO ESP32-C3**. |
+| **Sensor** | A standard **ADXL345 breakout board** (e.g. the common 2×8 header modules sold by Adafruit, SparkFun, DFRobot, and many AliExpress/Amazon sellers). These boards already include the ADXL345, the power regulator, and the decoupling capacitors, so no extra parts are needed. |
+| **MCU** | Any ESP32 / ESP8266 / RP2040 with SPI. The example below uses the **Seeed XIAO ESP32-C3**. |
 | **Supply** | 3.3 V (the ADXL345 operates at 2.0–3.6 V; 3.3 V is standard for ESP boards) |
 
 > **Note:** The ADXL345 requires **SPI Mode 3** (CPOL = 1, CPHA = 1) and a maximum clock of **5 MHz**. Set `spi_mode: MODE3` and `data_rate: 5 MHz` (or lower) on the SPI bus.
 
-## Wiring — XIAO ESP32-C3 → ADXL345
+## Wiring — XIAO ESP32-C3 → ADXL345 breakout
 
-The XIAO ESP32-C3 has 14 edge pins. The table below maps each ADXL345 pin to a XIAO pin.
+Most ADXL345 breakout boards expose a 2×8 (or 2×7) pin header with the
+following signals. The table maps each breakout pin to a XIAO ESP32-C3 pin.
 
-| ADXL345 Pin | Function | XIAO Pin | GPIO | Notes |
-|-------------|----------|----------|------|-------|
-| 1  | VDD I/O  | 3V3      | —    | 3.3 V power |
-| 2  | GND      | GND      | —    | Ground |
-| 6  | VS       | 3V3      | —    | 3.3 V supply (can share with VDD I/O) |
-| 7  | CS       | D1       | GPIO3 | Chip select (active low) |
-| 8  | INT1     | —        | —    | Optional: interrupt output 1 |
-| 9  | INT2     | —        | —    | Optional: interrupt output 2 |
-| 12 | SDO/ALT  | D9       | GPIO9 | MISO (data out from sensor) |
-| 13 | SDA/SDI  | D10      | GPIO10 | MOSI (data in to sensor) |
-| 14 | SCL/SCLK | D8       | GPIO8 | SCLK (clock) |
+| Breakout pin | Function | XIAO Pin | GPIO | Notes |
+|--------------|----------|----------|------|-------|
+| VCC  | 3.3 V power  | 3V3      | —    | 3.3 V power |
+| GND  | Ground       | GND      | —    | Ground |
+| CS   | Chip select  | D1       | GPIO3 | Active low |
+| SCLK | SPI clock    | D8       | GPIO8 | Clock |
+| MOSI | Data in      | D10      | GPIO10 | Data to sensor |
+| MISO | Data out     | D9       | GPIO9 | Data from sensor |
+| INT1 | Interrupt 1  | —        | —    | Optional (not used by this driver) |
+| INT2 | Interrupt 2  | —        | —    | Optional (not used by this driver) |
+
+> Some breakouts label the data pins `SDI`/`SDO` or `MOSI`/`MISO` — they are
+> the same signals. If your breakout has a `GND` pin in the middle of the
+> header, connect it to the XIAO GND as well.
 
 ### Wiring diagram
 
 ```
-  XIAO ESP32-C3              ADXL345
-  ─────────────              ───────
-  3V3  ──────────────────►  VDD I/O (pin 1)
-  3V3  ──────────────────►  VS        (pin 6)
-  GND  ──────────────────►  GND       (pins 2, 4, 5)
-  D1   ──────────────────►  CS        (pin 7)
-  D8   ──────────────────►  SCLK      (pin 14)
-  D9   ──────────────────►  SDO/MISO  (pin 12)
-  D10  ──────────────────►  SDI/MOSI  (pin 13)
-  (optional) D2 ────────►  INT1      (pin 8)
-  (optional) D3 ────────►  INT2      (pin 9)
+  XIAO ESP32-C3              ADXL345 breakout
+  ─────────────              ────────────────
+  3V3  ──────────────────►  VCC
+  GND  ──────────────────►  GND
+  D1   ──────────────────►  CS
+  D8   ──────────────────►  SCLK
+  D9   ──────────────────►  MISO
+  D10  ──────────────────►  MOSI
 ```
 
-> **Decoupling:** Place a 1 µF tantalum capacitor at VS and a 0.1 µF ceramic capacitor at VDD I/O, close to the ADXL345, to reduce noise.
+> **No extra parts needed.** Unlike a bare ADXL345 chip, a breakout board
+> already has the power regulator and decoupling capacitors fitted, so you only
+> need the six wires above.
 
 ## Installation
 
-### Option A: Local folder (for development)
+Add this to your ESPHome configuration to pull the component from this
+repository on GitHub:
 
-Place this repository's `components/` folder next to your ESPHome YAML file, then add:
+```yaml
+external_components:
+  - source: github://eddietheengineer/esphome-adxl345
+    components: [adxl345]
+```
+
+ESPHome clones the repo and loads the `adxl345` component automatically. No
+local files are required.
+
+<details>
+<summary><b>Alternative: local folder (for development / forking)</b></summary>
+
+If you fork the repository or want to develop against it locally, clone it next
+to your ESPHome YAML file and reference the local `components/` folder instead:
 
 ```yaml
 external_components:
@@ -59,15 +76,7 @@ external_components:
       path: ./components
 ```
 
-### Option B: Git repository (for production)
-
-Push this repository to GitHub, then reference it:
-
-```yaml
-external_components:
-  - source: github://<your-username>/esphome-adxl345
-    components: [adxl345]
-```
+</details>
 
 ## Example ESPHome configuration
 
@@ -76,9 +85,8 @@ esphome:
   name: adxl345-xiao-c3
 
 external_components:
-  - source:
-      type: local
-      path: ./components
+  - source: github://eddietheengineer/esphome-adxl345
+    components: [adxl345]
 
 esp32:
   board: esp32-c3-devkitm-1
@@ -266,6 +274,6 @@ binary_sensor:
 
 ## Troubleshooting
 
-- **"ADXL345 not detected"** — Verify the CS pin, SPI mode (must be `MODE3`), and that the sensor is powered. Check the serial log for the DEVID error.
-- **Noisy readings** — Add decoupling capacitors (1 µF at VS, 0.1 µF at VDD I/O). Try lowering `data_rate` to `2 MHz` or `1 MHz`.
+- **"ADXL345 not detected"** — Verify the CS pin, SPI mode (must be `MODE3`), and that the breakout's VCC is connected to 3.3 V (not 5 V). Check the serial log for the DEVID error.
+- **Noisy readings** — Breakout boards already include decoupling capacitors, so try lowering `data_rate` to `2 MHz` or `1 MHz` first. If you are using a bare ADXL345 chip (not a breakout), add a 1 µF capacitor at VS and a 0.1 µF at VDD I/O.
 - **Wrong tilt direction** — The ADXL345's axes depend on how the sensor is mounted. Adjust the tilt sensor `axis` values or add a rotation in a Home Assistant template sensor if needed.

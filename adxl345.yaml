@@ -2,8 +2,8 @@
 # ADXL345 3-axis accelerometer on a Seeed XIAO ESP32-C3 (SPI mode)
 # =============================================================================
 #
-# Wiring (XIAO ESP32-C3 -> ADXL345):
-#   3V3  -> VDD (3.3V)
+# Wiring (XIAO ESP32-C3 -> ADXL345 breakout board):
+#   3V3  -> VCC    (3.3V)
 #   GND  -> GND
 #   D8   -> SCLK   (GPIO8)
 #   D9   -> MISO   (GPIO9)
@@ -11,6 +11,8 @@
 #   D1   -> CS     (GPIO3)
 #
 # The ADXL345 requires SPI MODE3 (CPOL=1, CPHA=1) and a max clock of 5 MHz.
+# Breakout boards already include the regulator + decoupling caps, so no
+# extra parts are needed.
 # =============================================================================
 
 esphome:
