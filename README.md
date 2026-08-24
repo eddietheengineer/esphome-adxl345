@@ -260,7 +260,7 @@ binary_sensor:
 - The driver polls the ADXL345's six data registers (0x32–0x37) in a single I2C burst read on every `update_interval` (default 100 ms).
 - Raw 16-bit two's-complement samples are converted to **g** using the configured range and resolution mode.
 - Tilt angles are computed from the static gravity vector using `atan2`.
-- The `INT_SOURCE` register (0x30) is polled each cycle; edge-triggered events (tap, double-tap, activity, inactivity, free-fall) fire the corresponding binary sensor callbacks.
+- The `INT_SOURCE` register (0x30) is polled each cycle; the tap, double-tap, activity, inactivity, and free-fall bits are reported as the current on/off level of the corresponding binary sensors (data-ready is reported whenever it is set).
 
 ## Troubleshooting
 

@@ -56,6 +56,11 @@ _SOURCE_TO_SETTER = {
     "free_fall": "set_free_fall_callback",
 }
 
+# Sources whose C++ callback receives the current level (bool) of the
+# interrupt bit and publishes it every cycle. data_ready is the exception:
+# its callback takes no argument and publishes true when the bit is set.
+_LEVEL_SOURCES = {"single_tap", "double_tap", "activity", "inactivity", "free_fall"}
+
 
 async def to_code(config):
     # Create the binary sensor Pvariable.
@@ -68,11 +73,10 @@ async def to_code(config):
     source = config[CONF_SOURCE]
     setter = _SOURCE_TO_SETTER[source]
 
-    # Build the C++ statement:
-    #   parent->set_X_callback([&] { var->publish_state(true); });
-    stmt = (
-        f"{parent}->{setter}([&] {{ "
-        f"{var}->publish_state(true); "
-        f"}});"
-    )
+    # Build the C++ statement. Level sources receive the current bit state
+    # (bool) and publish it; data_ready publishes true when its bit is set.
+    if source in _LEVEL_SOURCES:
+        stmt = f"{parent}->{setter}([&](bool val) {{ {var}->publish_state(val); }});"
+    else:
+        stmt = f"{parent}->{setter}([&] {{ {var}->publish_state(true); }});"
     cg.add(cg.RawExpression(stmt))

@@ -143,10 +143,6 @@ void ADXL345::setup() {
   this->write_register(REG_OFSY, static_cast<uint8_t>(this->ofsy_));
   this->write_register(REG_OFSZ, static_cast<uint8_t>(this->ofsz_));
 
-  // Prime the interrupt source state so the first loop() iteration does not
-  // fire a spurious edge.
-  this->read_int_source(&this->last_int_source_);
-
   ESP_LOGD(TAG, "ADXL345 configured: range=%+dg, full_res=%d, rate_code=0x%02X, low_power=%d",
            this->full_scale_g(), this->full_res_, this->rate_code_, this->low_power_);
 }
@@ -207,39 +203,27 @@ void ADXL345::update() {
   if (this->tilt_z_callback_)
     this->tilt_z_callback_(tilt_z);
 
-  // Read the interrupt source register and fire edge-triggered callbacks.
+  // Read the interrupt source register. DATA_READY is reported whenever it is
+  // set; the remaining event bits are reported as their current on/off level,
+  // since the ADXL345 sets and clears them in hardware. Publishing the level
+  // every cycle gives the binary sensors an initial state (instead of
+  // "unknown") and keeps them in sync as the bits toggle.
   uint8_t int_source = 0;
   if (this->read_int_source(&int_source)) {
-    // DATA_READY is level-based and is cleared by reading the data registers,
-    // so we report it every time it is set.
     if (int_source & IS_DATA_READY) {
       if (this->data_ready_callback_)
         this->data_ready_callback_();
     }
-    // The remaining interrupts are edge-triggered: fire only on a rising
-    // edge relative to the previous read.
-    uint8_t rising = int_source & ~this->last_int_source_;
-    if (rising & IS_SINGLE_TAP) {
-      if (this->single_tap_callback_)
-        this->single_tap_callback_();
-    }
-    if (rising & IS_DOUBLE_TAP) {
-      if (this->double_tap_callback_)
-        this->double_tap_callback_();
-    }
-    if (rising & IS_ACTIVITY) {
-      if (this->activity_callback_)
-        this->activity_callback_();
-    }
-    if (rising & IS_INACTIVITY) {
-      if (this->inactivity_callback_)
-        this->inactivity_callback_();
-    }
-    if (rising & IS_FREE_FALL) {
-      if (this->free_fall_callback_)
-        this->free_fall_callback_();
-    }
-    this->last_int_source_ = int_source;
+    if (this->single_tap_callback_)
+      this->single_tap_callback_((int_source & IS_SINGLE_TAP) != 0);
+    if (this->double_tap_callback_)
+      this->double_tap_callback_((int_source & IS_DOUBLE_TAP) != 0);
+    if (this->activity_callback_)
+      this->activity_callback_((int_source & IS_ACTIVITY) != 0);
+    if (this->inactivity_callback_)
+      this->inactivity_callback_((int_source & IS_INACTIVITY) != 0);
+    if (this->free_fall_callback_)
+      this->free_fall_callback_((int_source & IS_FREE_FALL) != 0);
   }
 
   // Report the FIFO status (number of buffered samples).

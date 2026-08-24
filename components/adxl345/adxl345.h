@@ -136,11 +136,11 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   void set_tilt_y_callback(std::function<void(float)> &&f) { this->tilt_y_callback_ = std::move(f); }
   void set_tilt_z_callback(std::function<void(float)> &&f) { this->tilt_z_callback_ = std::move(f); }
   void set_data_ready_callback(std::function<void()> &&f) { this->data_ready_callback_ = std::move(f); }
-  void set_single_tap_callback(std::function<void()> &&f) { this->single_tap_callback_ = std::move(f); }
-  void set_double_tap_callback(std::function<void()> &&f) { this->double_tap_callback_ = std::move(f); }
-  void set_activity_callback(std::function<void()> &&f) { this->activity_callback_ = std::move(f); }
-  void set_inactivity_callback(std::function<void()> &&f) { this->inactivity_callback_ = std::move(f); }
-  void set_free_fall_callback(std::function<void()> &&f) { this->free_fall_callback_ = std::move(f); }
+  void set_single_tap_callback(std::function<void(bool)> &&f) { this->single_tap_callback_ = std::move(f); }
+  void set_double_tap_callback(std::function<void(bool)> &&f) { this->double_tap_callback_ = std::move(f); }
+  void set_activity_callback(std::function<void(bool)> &&f) { this->activity_callback_ = std::move(f); }
+  void set_inactivity_callback(std::function<void(bool)> &&f) { this->inactivity_callback_ = std::move(f); }
+  void set_free_fall_callback(std::function<void(bool)> &&f) { this->free_fall_callback_ = std::move(f); }
   void set_fifo_status_callback(std::function<void(uint8_t)> &&f) { this->fifo_status_callback_ = std::move(f); }
 
   // Trigger a self-test pulse: enables self-test, waits for the output to
@@ -204,9 +204,6 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   float y_g_{0.0f};
   float z_g_{0.0f};
 
-  // Interrupt edge-detection state.
-  uint8_t last_int_source_{0x00};
-
   // Callbacks.
   std::function<void(float)> x_callback_;
   std::function<void(float)> y_callback_;
@@ -216,11 +213,11 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   std::function<void(float)> tilt_y_callback_;
   std::function<void(float)> tilt_z_callback_;
   std::function<void()> data_ready_callback_;
-  std::function<void()> single_tap_callback_;
-  std::function<void()> double_tap_callback_;
-  std::function<void()> activity_callback_;
-  std::function<void()> inactivity_callback_;
-  std::function<void()> free_fall_callback_;
+  std::function<void(bool)> single_tap_callback_;
+  std::function<void(bool)> double_tap_callback_;
+  std::function<void(bool)> activity_callback_;
+  std::function<void(bool)> inactivity_callback_;
+  std::function<void(bool)> free_fall_callback_;
   std::function<void(uint8_t)> fifo_status_callback_;
 };
 

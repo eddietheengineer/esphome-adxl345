@@ -23,6 +23,18 @@ CONF_PARENT_ID = "adxl345_id"
 #
 # The `adxl345_id` field references the ADXL345 component.
 # ---------------------------------------------------------------------------
+
+# Tilt axes report an angle in degrees; the acceleration axes report g.
+TILT_AXES = {"tilt_x", "tilt_y", "tilt_z"}
+
+
+def _default_unit(config):
+    """Default the unit to degrees for tilt axes and g for acceleration axes."""
+    if "unit_of_measurement" not in config:
+        config["unit_of_measurement"] = (
+            UNIT_DEGREES if config[CONF_AXIS] in TILT_AXES else UNIT_G
+        )
+    return config
 CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
@@ -41,7 +53,7 @@ CONFIG_SCHEMA = cv.All(
                 lower=True,
             ),
             cv.Required(CONF_PARENT_ID): cv.use_id(ADXL345),
-            cv.Optional("unit_of_measurement", default=UNIT_G): cv.string,
+            cv.Optional("unit_of_measurement"): cv.string,
             cv.Optional("accuracy_decimals", default=3): cv.int_,
             cv.Optional("icon"): cv.icon,
             cv.Optional("device_class"): cv.string,
@@ -53,6 +65,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional("force_update", default=False): cv.boolean,
         }
     ),
+    _default_unit,
 )
 
 
