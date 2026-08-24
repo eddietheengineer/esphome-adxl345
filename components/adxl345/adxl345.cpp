@@ -71,9 +71,18 @@ float ADXL345::raw_to_g(int16_t raw) const {
 // Setup.
 // ---------------------------------------------------------------------------
 void ADXL345::setup() {
-  // Verify the device is present and is an ADXL345.
+  // Verify the device is present and is an ADXL345. The first read after
+  // boot can race the sensor's power-up or the I2C bus settling (the bus
+  // scan's address probe can succeed while the first data read fails), so
+  // retry a few times before declaring failure.
   uint8_t devid = 0;
-  if (!this->read_register(REG_DEVID, &devid) || devid != DEVID_VALUE) {
+  bool detected = false;
+  for (int attempt = 0; attempt < 5 && !detected; attempt++) {
+    if (attempt > 0)
+      delay(100);
+    detected = this->read_register(REG_DEVID, &devid) && devid == DEVID_VALUE;
+  }
+  if (!detected) {
     ESP_LOGE(TAG, "ADXL345 not detected (DEVID=0x%02X, expected 0x%02X). Check the I2C wiring (SDA/SCL) and that the device answers at address 0x53.",
              devid, DEVID_VALUE);
     this->setup_failed_ = true;
