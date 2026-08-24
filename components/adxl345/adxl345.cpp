@@ -7,42 +7,26 @@ namespace adxl345 {
 static const char *TAG = "adxl345";
 
 // ---------------------------------------------------------------------------
-// Low-level SPI register access.
+// Low-level I2C register access.
 //
-// ADXL345 4-wire SPI command byte layout (MSB first):
-//   bit 7   : 0 = read, 1 = write
-//   bit 6   : 1 = multi-byte (burst) transfer
-//   bits 5-0: register address
-//
-// For a burst read the address byte is followed by the data bytes; the
-// device auto-increments the register pointer on each subsequent byte.
+// The ADXL345 uses a register-pointer protocol over I2C (fixed 7-bit
+// address 0x53): the controller writes the 6-bit register address, then
+// either reads data bytes or writes a data byte. On reads the register
+// pointer auto-increments, so a burst read of the six data registers is a
+// single 6-byte transfer starting at 0x32.
 // ---------------------------------------------------------------------------
 bool ADXL345::read_register(uint8_t reg, uint8_t *out) {
-  uint8_t cmd = 0x80 | (reg & 0x3F);  // read, single-byte
-  this->enable();
-  this->write_byte(cmd);
-  *out = this->read_byte();
-  this->disable();
-  return true;
+  return this->read_byte(reg, out);
 }
 
 bool ADXL345::write_register(uint8_t reg, uint8_t value) {
-  uint8_t cmd = 0xC0 | (reg & 0x3F);  // write, single-byte
-  this->enable();
-  this->write_byte(cmd);
-  this->write_byte(value);
-  this->disable();
-  return true;
+  return this->write_byte(reg, value);
 }
 
 bool ADXL345::read_data_registers(uint8_t *out) {
-  // Burst read of the six data registers (0x32..0x37) in one transaction.
-  uint8_t cmd = 0xC0 | (REG_DATA_X0 & 0x3F);  // read + multi-byte
-  this->enable();
-  this->write_byte(cmd);
-  this->read_array(out, 6);
-  this->disable();
-  return true;
+  // Burst read of the six data registers (0x32..0x37) in one transaction;
+  // the register pointer auto-increments.
+  return this->read_bytes(REG_DATA_X0, out, 6);
 }
 
 bool ADXL345::read_fifo_status(uint8_t *out) {
@@ -90,7 +74,7 @@ void ADXL345::setup() {
   // Verify the device is present and is an ADXL345.
   uint8_t devid = 0;
   if (!this->read_register(REG_DEVID, &devid) || devid != DEVID_VALUE) {
-    ESP_LOGE(TAG, "ADXL345 not detected (DEVID=0x%02X, expected 0x%02X). Check SPI wiring and CS pin.",
+    ESP_LOGE(TAG, "ADXL345 not detected (DEVID=0x%02X, expected 0x%02X). Check the I2C wiring (SDA/SCL) and that the device answers at address 0x53.",
              devid, DEVID_VALUE);
     this->setup_failed_ = true;
     this->mark_failed();
@@ -108,7 +92,7 @@ void ADXL345::setup() {
     data_format |= DF_INT_INVERT;
   if (this->self_test_)
     data_format |= DF_SELF_TEST;
-  // 4-wire SPI mode: DF_SPI bit must be 0.
+  // I2C mode: the DF_SPI bit (bit 6) must be 0.
   data_format &= ~DF_SPI;
   data_format |= (this->range_bits_ & DF_RANGE_MASK);
   this->write_register(REG_DATA_FORMAT, data_format);
@@ -169,6 +153,7 @@ void ADXL345::setup() {
 
 void ADXL345::dump_config() {
   ESP_LOGCONFIG(TAG, "ADXL345");
+  LOG_I2C_DEVICE(this);
   ESP_LOGCONFIG(TAG, "  Range: %+.0f g", this->full_scale_g());
   ESP_LOGCONFIG(TAG, "  Full resolution: %s", this->full_res_ ? "yes" : "no");
   ESP_LOGCONFIG(TAG, "  Data rate code: 0x%02X", this->rate_code_);

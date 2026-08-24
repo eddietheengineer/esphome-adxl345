@@ -6,7 +6,7 @@
 #include "esphome/core/defines.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/automation.h"
-#include "esphome/components/spi/spi.h"
+#include "esphome/components/i2c/i2c.h"
 
 namespace esphome {
 namespace adxl345 {
@@ -88,14 +88,13 @@ struct RangeSetting {
 // ---------------------------------------------------------------------------
 // ADXL345 driver.
 //
-// The device is driven over 4-wire SPI. The ADXL345 requires SPI mode 3
-// (CPOL=1, CPHA=1) and a maximum clock of 5 MHz. This class is templated on
-// the SPI parameters via esphome::spi::SPIDevice and is configured at build
-// time from the YAML `spi_device` / `data_rate` / `spi_mode` keys.
+// The device is driven over I2C at its fixed 7-bit address 0x53. Register
+// access uses the standard register-pointer protocol: write the register
+// address, then read (the pointer auto-increments for burst reads) or write
+// the data byte. The ADXL345's SDO and CS pins are SPI-only and are not used
+// in I2C mode.
 // ---------------------------------------------------------------------------
-class ADXL345 : public PollingComponent,
-               public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_HIGH,
-                                      spi::CLOCK_PHASE_TRAILING, spi::DATA_RATE_1MHZ> {
+class ADXL345 : public PollingComponent, public i2c::I2CDevice {
  public:
   void set_range(uint8_t range_bits) { this->range_bits_ = range_bits; }
   void set_data_rate_code(uint8_t rate_code) { this->rate_code_ = rate_code; }
@@ -156,7 +155,7 @@ class ADXL345 : public PollingComponent,
   void dump_config() override;
   void update() override;
 
-  // Low-level SPI access.
+  // Low-level I2C register access.
   bool read_register(uint8_t reg, uint8_t *out);
   bool write_register(uint8_t reg, uint8_t value);
   bool read_data_registers(uint8_t *out);  // 6 bytes: X0 X1 Y0 Y1 Z0 Z1

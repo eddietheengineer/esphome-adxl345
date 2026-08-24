@@ -1,18 +1,17 @@
 # =============================================================================
-# ADXL345 3-axis accelerometer on a Seeed XIAO ESP32-C3 (SPI mode)
+# ADXL345 3-axis accelerometer on a Seeed XIAO ESP32-C3 (I2C mode)
 # =============================================================================
 #
 # Wiring (XIAO ESP32-C3 -> ADXL345 breakout board):
 #   3V3  -> VCC    (3.3V)
 #   GND  -> GND
-#   D8   -> SCLK   (GPIO8)
-#   D9   -> MISO   (GPIO9)
-#   D10  -> MOSI   (GPIO10)
-#   D1   -> CS     (GPIO3)
+#   D4   -> SDA    (GPIO6)
+#   D5   -> SCL    (GPIO7)
 #
-# The ADXL345 requires SPI MODE3 (CPOL=1, CPHA=1) and a max clock of 5 MHz.
-# Breakout boards already include the regulator + decoupling caps, so no
-# extra parts are needed.
+# The ADXL345 has a fixed I2C address of 0x53. The breakout's SDO and CS
+# pins are SPI-only and are left unconnected in I2C mode. Breakout boards
+# already include the regulator + decoupling caps, so no extra parts are
+# needed.
 # =============================================================================
 
 esphome:
@@ -33,21 +32,15 @@ esp32:
 # Enable logging so you can see the ADXL345 setup messages.
 logger:
 
-# Enable the SPI bus.
-spi:
-  id: spi_bus
-  clk_pin: GPIO8      # XIAO D8  -> SCLK
-  mosi_pin: GPIO10   # XIAO D10 -> MOSI
-  miso_pin: GPIO9    # XIAO D9  -> MISO
+# Enable the I2C bus.
+i2c:
+  sda: GPIO6    # XIAO D4 -> SDA
+  scl: GPIO7    # XIAO D5 -> SCL
 
-# The ADXL345 component.
+# The ADXL345 component (fixed I2C address 0x53).
 adxl345:
   id: adxl345_sensor
   name: ADXL345
-  cs_pin: GPIO3       # XIAO D1 -> CS
-  spi_id: spi_bus
-  spi_mode: MODE3     # ADXL345 requires CPOL=1, CPHA=1
-  data_rate: 5 MHz    # SPI bus clock (max 5 MHz for ADXL345)
   output_rate: 100 Hz # sensor output data rate (BW_RATE register)
   range: 4 g          # full-scale range (DATA_FORMAT range bits)
   full_resolution: true

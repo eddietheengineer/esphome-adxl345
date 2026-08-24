@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "description": "ADXL345 3-axis accelerometer driver for ESPHome (SPI mode)",
+  "description": "ADXL345 3-axis accelerometer driver for ESPHome (I2C mode)",
   "dependencies": {
     "esphome": ">=2024.10.0"
   }

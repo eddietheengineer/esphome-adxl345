@@ -1,20 +1,15 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome import pins
-from esphome.components import spi
+from esphome.components import i2c
 from esphome.const import (
-    CONF_DATA_RATE,
     CONF_ID,
     CONF_NAME,
-    CONF_SPI_ID,
 )
 
-DEPENDENCIES = ["spi"]
+DEPENDENCIES = ["i2c"]
 
 adxl345_ns = cg.esphome_ns.namespace("adxl345")
-ADXL345 = adxl345_ns.class_(
-    "ADXL345", cg.Component, spi.SPIDevice
-)
+ADXL345 = adxl345_ns.class_("ADXL345", cg.Component, i2c.I2CDevice)
 
 # ---------------------------------------------------------------------------
 # Data-rate presets (BW_RATE register, 0x2C).
@@ -98,8 +93,9 @@ def _validate_wakeup(value):
 # ---------------------------------------------------------------------------
 # Main component schema.
 #
-# SPI bus parameters (cs_pin, data_rate, spi_mode, spi_id) come from
-# spi_device_schema(). ADXL345-specific options are defined here.
+# I2C bus parameters (i2c_id, address) come from i2c_device_schema(). The
+# ADXL345 has a fixed 7-bit address of 0x53. ADXL345-specific options are
+# defined here.
 # ---------------------------------------------------------------------------
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -145,14 +141,14 @@ CONFIG_SCHEMA = (
         }
     )
     .extend(cv.polling_component_schema("100ms"))
-    .extend(spi.spi_device_schema(cs_pin_required=True))
+    .extend(i2c.i2c_device_schema(0x53))
 )
 
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-    await spi.register_spi_device(var, config)
+    await i2c.register_i2c_device(var, config)
 
     # Sensor output data rate (BW_RATE register).
     cg.add(var.set_data_rate_code(DATA_RATE_PRESETS[config["output_rate"]]))

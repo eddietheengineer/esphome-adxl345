@@ -4,30 +4,24 @@
 # `external_components` entry loads the component from the repo's
 # components/ folder (three levels up from this file).
 #
-# The four SPI/CS pins are parameterised with substitutions
-# (clk_pin / mosi_pin / miso_pin / cs_pin) so each per-platform test file
-# can supply pins that are valid for that board. This file is otherwise
-# platform-agnostic: it defines the SPI bus, the ADXL345 component, and
-# every sensor / binary-sensor the component exposes.
+# The two I2C pins are parameterised with substitutions (sda /
+# scl) so each per-platform test file can supply pins that are valid
+# for that board. This file is otherwise platform-agnostic: it defines the
+# I2C bus, the ADXL345 component, and every sensor / binary-sensor the
+# component exposes.
 
 external_components:
   - source:
       type: local
       path: ../../../components
 
-spi:
-  id: spi_bus
-  clk_pin: ${clk_pin}
-  mosi_pin: ${mosi_pin}
-  miso_pin: ${miso_pin}
+i2c:
+  sda: ${sda}
+  scl: ${scl}
 
 adxl345:
   id: adxl345_sensor
   name: ADXL345
-  cs_pin: ${cs_pin}
-  spi_id: spi_bus
-  spi_mode: MODE3
-  data_rate: 5 MHz
   output_rate: 100 Hz
   range: 4 g
   full_resolution: true

@@ -1,11 +1,9 @@
 # Classic ESP32 (Xtensa) / Arduino — covers the Xtensa architecture.
-# Uses GPIO18/23/19/5, which are free on the esp32dev board (the XIAO C3
-# pins are flash pins on the classic ESP32 and cannot be reused).
+# Uses GPIO21/22 (the classic ESP32 I2C pins), which are free on the
+# esp32dev board.
 substitutions:
-  clk_pin: GPIO18
-  mosi_pin: GPIO23
-  miso_pin: GPIO19
-  cs_pin: GPIO5
+  sda: GPIO21
+  scl: GPIO22
 
 esphome:
   name: adxl345-test-esp32-ard

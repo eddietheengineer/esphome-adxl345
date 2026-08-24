@@ -1,16 +1,16 @@
 # ADXL345 ESPHome External Component
 
-A 3-axis accelerometer driver for the [Analog Devices ADXL345](https://www.analog.com/en/products/adxl345.html), connected via **SPI (4-wire mode)**. Exposes X/Y/Z acceleration, vector magnitude, tilt angles, and interrupt events (tap, double-tap, activity, inactivity, free-fall) as Home Assistant sensors.
+A 3-axis accelerometer driver for the [Analog Devices ADXL345](https://www.analog.com/en/products/adxl345.html), connected via **I2C**. Exposes X/Y/Z acceleration, vector magnitude, tilt angles, and interrupt events (tap, double-tap, activity, inactivity, free-fall) as Home Assistant sensors.
 
 ## Hardware
 
 | Item | Notes |
 |------|-------|
 | **Sensor** | A standard **ADXL345 breakout board** (e.g. the common 2×8 header modules sold by Adafruit, SparkFun, DFRobot, and many AliExpress/Amazon sellers). These boards already include the ADXL345, the power regulator, and the decoupling capacitors, so no extra parts are needed. |
-| **MCU** | Any ESP32 / ESP8266 / RP2040 with SPI. The example below uses the **Seeed XIAO ESP32-C3**. |
+| **MCU** | Any ESP32 / ESP8266 / RP2040 with I2C. The example below uses the **Seeed XIAO ESP32-C3**. |
 | **Supply** | 3.3 V (the ADXL345 operates at 2.0–3.6 V; 3.3 V is standard for ESP boards) |
 
-> **Note:** The ADXL345 requires **SPI Mode 3** (CPOL = 1, CPHA = 1) and a maximum clock of **5 MHz**. Set `spi_mode: MODE3` and `data_rate: 5 MHz` (or lower) on the SPI bus.
+> **Note:** The ADXL345 has a **fixed I2C address of 0x53** — there is no address pin. The breakout's `SDO` and `CS` pins are SPI-only and are left unconnected in I2C mode.
 
 ## Wiring — XIAO ESP32-C3 → ADXL345 breakout
 
@@ -21,16 +21,16 @@ following signals. The table maps each breakout pin to a XIAO ESP32-C3 pin.
 |--------------|----------|----------|------|-------|
 | VCC  | 3.3 V power  | 3V3      | —    | 3.3 V power |
 | GND  | Ground       | GND      | —    | Ground |
-| CS   | Chip select  | D1       | GPIO3 | Active low |
-| SCLK | SPI clock    | D8       | GPIO8 | Clock |
-| MOSI | Data in      | D10      | GPIO10 | Data to sensor |
-| MISO | Data out     | D9       | GPIO9 | Data from sensor |
+| SDA  | I2C data     | D4       | GPIO6 | Data |
+| SCL  | I2C clock    | D5       | GPIO7 | Clock |
+| SDO  | SPI data out | —        | —    | Not used in I2C mode |
+| CS   | SPI chip select | —      | —    | Not used in I2C mode |
 | INT1 | Interrupt 1  | —        | —    | Optional (not used by this driver) |
 | INT2 | Interrupt 2  | —        | —    | Optional (not used by this driver) |
 
-> Some breakouts label the data pins `SDI`/`SDO` or `MOSI`/`MISO` — they are
-> the same signals. If your breakout has a `GND` pin in the middle of the
-> header, connect it to the XIAO GND as well.
+> Some breakouts label the SPI pins `SDO`/`CS` or `MOSI`/`MISO` — only the
+> I2C pair (`SDA`/`SCL`) is needed here. If your breakout has a `GND` pin
+> in the middle of the header, connect it to the XIAO GND as well.
 
 ### Wiring diagram
 
@@ -39,15 +39,13 @@ following signals. The table maps each breakout pin to a XIAO ESP32-C3 pin.
   ─────────────              ────────────────
   3V3  ──────────────────►  VCC
   GND  ──────────────────►  GND
-  D1   ──────────────────►  CS
-  D8   ──────────────────►  SCLK
-  D9   ──────────────────►  MISO
-  D10  ──────────────────►  MOSI
+  D4   ──────────────────►  SDA
+  D5   ──────────────────►  SCL
 ```
 
 > **No extra parts needed.** Unlike a bare ADXL345 chip, a breakout board
 > already has the power regulator and decoupling capacitors fitted, so you only
-> need the six wires above.
+> need the four wires above.
 
 ## Installation
 
@@ -96,21 +94,15 @@ esp32:
 
 logger:
 
-# SPI bus — the ADXL345 requires MODE3 and ≤ 5 MHz.
-spi:
-  id: spi_bus
-  clk_pin: GPIO8      # XIAO D8  → SCLK
-  mosi_pin: GPIO10    # XIAO D10 → MOSI
-  miso_pin: GPIO9     # XIAO D9  → MISO
+# I2C bus.
+i2c:
+  sda: GPIO6    # XIAO D4 → SDA
+  scl: GPIO7    # XIAO D5 → SCL
 
-# ADXL345 component.
+# ADXL345 component (fixed I2C address 0x53).
 adxl345:
   id: adxl345_sensor
   name: ADXL345
-  cs_pin: GPIO3         # XIAO D1 → CS
-  spi_id: spi_bus
-  spi_mode: MODE3       # Required: CPOL=1, CPHA=1
-  data_rate: 5 MHz      # SPI bus clock (max 5 MHz)
   output_rate: 100 Hz   # Sensor output data rate (BW_RATE register)
   range: 4 g            # Full-scale range (±2/±4/±8/±16 g)
   full_resolution: true # 4 mg/LSB in all ranges (vs 10-bit fixed)
@@ -216,10 +208,8 @@ binary_sensor:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `name` | string | — | Component name (required). |
-| `cs_pin` | pin | — | Chip-select pin (required). |
-| `spi_id` | id | — | Reference to the `spi:` bus (required). |
-| `spi_mode` | enum | `MODE3` | SPI mode. Must be `MODE3` for the ADXL345. |
-| `data_rate` | frequency | `5 MHz` | SPI bus clock. Max 5 MHz. |
+| `i2c_id` | id | first bus | Reference to the `i2c:` bus. |
+| `address` | int | `0x53` | I2C address. Fixed at 0x53 by the ADXL345 hardware. |
 | `output_rate` | enum | `100 Hz` | Sensor output data rate (BW_RATE register). Options: `6.25 Hz` … `3200 Hz`. |
 | `range` | enum | `4 g` | Full-scale range. Options: `2 g`, `4 g`, `8 g`, `16 g`. |
 | `full_resolution` | bool | `true` | Full-resolution mode (4 mg/LSB in all ranges) vs 10-bit fixed. |
@@ -267,13 +257,13 @@ binary_sensor:
 
 ## How it works
 
-- The driver polls the ADXL345's six data registers (0x32–0x37) in a single SPI burst read on every `update_interval` (default 100 ms).
+- The driver polls the ADXL345's six data registers (0x32–0x37) in a single I2C burst read on every `update_interval` (default 100 ms).
 - Raw 16-bit two's-complement samples are converted to **g** using the configured range and resolution mode.
 - Tilt angles are computed from the static gravity vector using `atan2`.
 - The `INT_SOURCE` register (0x30) is polled each cycle; edge-triggered events (tap, double-tap, activity, inactivity, free-fall) fire the corresponding binary sensor callbacks.
 
 ## Troubleshooting
 
-- **"ADXL345 not detected"** — Verify the CS pin, SPI mode (must be `MODE3`), and that the breakout's VCC is connected to 3.3 V (not 5 V). Check the serial log for the DEVID error.
-- **Noisy readings** — Breakout boards already include decoupling capacitors, so try lowering `data_rate` to `2 MHz` or `1 MHz` first. If you are using a bare ADXL345 chip (not a breakout), add a 1 µF capacitor at VS and a 0.1 µF at VDD I/O.
+- **"ADXL345 not detected"** — Verify the SDA/SCL wiring, that the breakout's VCC is connected to 3.3 V (not 5 V), and that the device answers at address 0x53 (e.g. with an I2C bus scanner). Check the serial log for the DEVID error.
+- **Noisy readings** — Breakout boards already include decoupling capacitors. If you are using a bare ADXL345 chip (not a breakout), add a 1 µF capacitor at VS and a 0.1 µF at VDD I/O, and make sure the I2C bus has pull-ups (most ESP boards and breakouts already provide them).
 - **Wrong tilt direction** — The ADXL345's axes depend on how the sensor is mounted. Adjust the tilt sensor `axis` values or add a rotation in a Home Assistant template sensor if needed.
