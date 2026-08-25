@@ -1,7 +1,9 @@
 #pragma once
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include <cstdint>
+#include <vector>
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
 #include "esphome/core/hal.h"
@@ -79,6 +81,10 @@ constexpr uint8_t IS_FREE_FALL = 0x04;
 constexpr uint8_t IS_WATERMARK = 0x02;
 constexpr uint8_t IS_OVERRUN = 0x01;
 
+// How often (microseconds) the "slow" work (regular sensor publish +
+// interrupt / FIFO reads) runs while vibration analysis samples at ~1 kHz.
+constexpr uint32_t SLOW_PERIOD_US = 100000;  // 100 ms -> 10 Hz
+
 // g-range setting (DATA_FORMAT range bits) -> full-scale acceleration in g.
 struct RangeSetting {
   uint8_t bits;
@@ -127,6 +133,24 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   void set_offset_y(int8_t v) { this->ofsy_ = v; }
   void set_offset_z(int8_t v) { this->ofsz_ = v; }
 
+  // Vibration analysis (FFT of one axis). Configured by the `vibration:`
+  // block; the three callbacks are wired up by the sensor platform.
+  void set_vibration_frequency_callback(std::function<void(float)> &&f) { this->vib_freq_callback_ = std::move(f); }
+  void set_vibration_amplitude_callback(std::function<void(float)> &&f) { this->vib_amp_callback_ = std::move(f); }
+  void set_vibration_deflection_callback(std::function<void(float)> &&f) { this->vib_defl_callback_ = std::move(f); }
+  void enable_vibration(int axis, int window_samples, float min_frequency, float sample_rate) {
+    this->vibration_enabled_ = true;
+    this->vib_axis_ = axis;
+    this->vib_window_ = window_samples;
+    this->min_frequency_ = min_frequency;
+    this->fs_nominal_ = sample_rate;
+    this->fs_actual_ = sample_rate;
+    this->vib_buf_.assign(window_samples, 0.0f);
+    this->fft_buf_.assign(window_samples, std::complex<float>(0.0f, 0.0f));
+    this->vib_idx_ = 0;
+    this->vib_count_ = 0;
+  }
+
   // Sensor callbacks (wired up by the Python sensor platforms).
   void set_x_callback(std::function<void(float)> &&f) { this->x_callback_ = std::move(f); }
   void set_y_callback(std::function<void(float)> &&f) { this->y_callback_ = std::move(f); }
@@ -167,6 +191,12 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   // Current full-scale range in g, derived from the configured range bits.
   float full_scale_g() const;
 
+  // Vibration analysis: run the FFT over the filled window and publish the
+  // dominant frequency / amplitude / deflection.
+  void run_vibration_analysis();
+  // In-place iterative radix-2 Cooley-Tukey FFT (n must be a power of two).
+  static void fft_radix2(std::complex<float> *a, int n);
+
   bool setup_failed_{false};
   uint8_t range_bits_{0x01};   // default ±4 g
   uint8_t rate_code_{0x0A};    // default 100 Hz
@@ -204,6 +234,24 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   float y_g_{0.0f};
   float z_g_{0.0f};
 
+  // Vibration analysis state. vib_buf_ holds the most recent vib_window_
+  // samples of the configured axis (in time order when the window fills);
+  // fft_buf_ is the in-place FFT workspace. While vibration is active the
+  // update() loop runs at ~1 kHz, so the regular publish + interrupt work is
+  // throttled to SLOW_PERIOD_US.
+  bool vibration_enabled_{false};
+  int vib_axis_{1};            // 0 = x, 1 = y, 2 = z
+  int vib_window_{2048};      // FFT size (power of two)
+  float min_frequency_{1.0f};  // Hz; ignore spectral bins below this
+  float fs_nominal_{1000.0f};  // configured sample rate (Hz)
+  float fs_actual_{1000.0f};   // measured sample rate (Hz), self-calibrated
+  std::vector<float> vib_buf_;
+  std::vector<std::complex<float>> fft_buf_;
+  size_t vib_idx_{0};
+  size_t vib_count_{0};
+  uint32_t window_start_us_{0};
+  uint32_t last_slow_us_{0};
+
   // Callbacks.
   std::function<void(float)> x_callback_;
   std::function<void(float)> y_callback_;
@@ -219,6 +267,9 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   std::function<void(bool)> inactivity_callback_;
   std::function<void(bool)> free_fall_callback_;
   std::function<void(uint8_t)> fifo_status_callback_;
+  std::function<void(float)> vib_freq_callback_;
+  std::function<void(float)> vib_amp_callback_;
+  std::function<void(float)> vib_defl_callback_;
 };
 
 }  // namespace adxl345

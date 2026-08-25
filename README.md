@@ -1,6 +1,6 @@
 # ADXL345 ESPHome External Component
 
-A 3-axis accelerometer driver for the [Analog Devices ADXL345](https://www.analog.com/en/products/adxl345.html), connected via **I2C**. Exposes X/Y/Z acceleration, vector magnitude, tilt angles, and interrupt events (tap, double-tap, activity, inactivity, free-fall) as Home Assistant sensors.
+A 3-axis accelerometer driver for the [Analog Devices ADXL345](https://www.analog.com/en/products/adxl345.html), connected via **I2C**. Exposes X/Y/Z acceleration, vector magnitude, tilt angles, vibration analysis (dominant frequency, amplitude, deflection), and interrupt events (tap, double-tap, activity, inactivity, free-fall) as Home Assistant sensors.
 
 ## Hardware
 
@@ -98,6 +98,7 @@ logger:
 i2c:
   sda: GPIO6    # XIAO D4 → SDA
   scl: GPIO7    # XIAO D5 → SCL
+  frequency: 400 kHz
 
 # ADXL345 component (fixed I2C address 0x53).
 adxl345:
@@ -107,6 +108,12 @@ adxl345:
   range: 4 g            # Full-scale range (±2/±4/±8/±16 g)
   full_resolution: true # 4 mg/LSB in all ranges (vs 10-bit fixed)
   low_power: false
+  # Vibration analysis: FFT of the Y axis (requires 400 kHz I2C).
+  vibration:
+    axis: y
+    sample_rate: 1000
+    window: 2s
+    min_frequency: 1
 
 # Acceleration sensors (in g).
 sensor:
@@ -152,6 +159,25 @@ sensor:
     axis: tilt_z
     adxl345_id: adxl345_sensor
     id: tilt_z
+
+  # Vibration analysis (FFT of the Y axis).
+  - platform: adxl345
+    name: "ADXL345 Vibration Frequency"
+    axis: vibration_frequency
+    adxl345_id: adxl345_sensor
+    id: vib_freq
+
+  - platform: adxl345
+    name: "ADXL345 Vibration Amplitude"
+    axis: vibration_amplitude
+    adxl345_id: adxl345_sensor
+    id: vib_amp
+
+  - platform: adxl345
+    name: "ADXL345 Vibration Deflection"
+    axis: vibration_deflection
+    adxl345_id: adxl345_sensor
+    id: vib_defl
 
 # Event / interrupt binary sensors.
 #
@@ -241,11 +267,23 @@ binary_sensor:
 | `offset_y` | int | `0` | Y-axis offset. |
 | `offset_z` | int | `0` | Z-axis offset. |
 
+### `vibration` block
+
+The optional `vibration:` sub-block runs an on-device FFT on one axis and
+exposes the dominant frequency, its amplitude, and the resulting deflection.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `axis` | enum | `y` | Which axis to analyze (`x`, `y`, or `z`). |
+| `sample_rate` | int | `1000` | Sampling rate in Hz (100–1000); sets the ODR and poll rate. |
+| `window` | time period | `2s` | FFT window length (e.g. `2s`, `500ms`). |
+| `min_frequency` | float | `1` | Lowest frequency to report, in Hz. |
+
 ### `sensor` platform
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `axis` | enum | `x`, `y`, `z`, `magnitude` (acceleration in g) or `tilt_x`, `tilt_y`, `tilt_z` (tilt in degrees). |
+| `axis` | enum | `x`, `y`, `z`, `magnitude` (acceleration in g), `tilt_x`, `tilt_y`, `tilt_z` (tilt in degrees), or `vibration_frequency` (Hz), `vibration_amplitude` (g), `vibration_deflection` (mm). |
 | `adxl345_id` | id | Reference to the `adxl345` component. |
 
 ### `binary_sensor` platform
@@ -261,9 +299,11 @@ binary_sensor:
 - Raw 16-bit two's-complement samples are converted to **g** using the configured range and resolution mode.
 - Tilt angles are computed from the static gravity vector using `atan2`.
 - The `INT_SOURCE` register (0x30) is polled each cycle; the tap, double-tap, activity, inactivity, and free-fall bits are reported as the current on/off level of the corresponding binary sensors (data-ready is reported whenever it is set).
+- With `vibration:` enabled, the driver samples the chosen axis at up to 1 kHz, accumulates a window of samples, and runs a radix-2 FFT on the main loop. The strongest spectral bin (above `min_frequency`) is reported as the dominant frequency, its amplitude (in g), and the resulting deflection (in mm).
 
 ## Troubleshooting
 
 - **"ADXL345 not detected"** — Verify the SDA/SCL wiring, that the breakout's VCC is connected to 3.3 V (not 5 V), and that the device answers at address 0x53 (e.g. with an I2C bus scanner). Check the serial log for the DEVID error.
 - **Noisy readings** — Breakout boards already include decoupling capacitors. If you are using a bare ADXL345 chip (not a breakout), add a 1 µF capacitor at VS and a 0.1 µF at VDD I/O, and make sure the I2C bus has pull-ups (most ESP boards and breakouts already provide them).
 - **Wrong tilt direction** — The ADXL345's axes depend on how the sensor is mounted. Adjust the tilt sensor `axis` values or add a rotation in a Home Assistant template sensor if needed.
+- **Vibration sensors not updating** — Vibration analysis needs a 400 kHz I2C bus (`frequency: 400 kHz` in the `i2c:` block). At the default 100 kHz the 1 kHz sampling rate cannot be sustained, so the FFT window never fills.

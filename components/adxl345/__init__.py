@@ -9,7 +9,9 @@ from esphome.const import (
 DEPENDENCIES = ["i2c"]
 
 adxl345_ns = cg.esphome_ns.namespace("adxl345")
-ADXL345 = adxl345_ns.class_("ADXL345", cg.Component, i2c.I2CDevice)
+ADXL345 = adxl345_ns.class_("ADXL345", cg.PollingComponent, i2c.I2CDevice)
+
+CONF_VIBRATION = "vibration"
 
 # ---------------------------------------------------------------------------
 # Data-rate presets (BW_RATE register, 0x2C).
@@ -56,6 +58,36 @@ WAKEUP_PRESETS = {
     "2 Hz": 0x02,
     "1 Hz": 0x03,
 }
+
+
+def _rate_hz(rate):
+    """'1000 Hz' -> 1000.0 (the numeric part of a data-rate preset name)."""
+    return float(str(rate).split()[0])
+
+
+def _odr_code_for(rate_hz):
+    """Smallest BW_RATE preset at or above rate_hz, so each poll is a fresh sample."""
+    best_code = None
+    best_hz = None
+    for name, code in DATA_RATE_PRESETS.items():
+        hz = _rate_hz(name)
+        if hz >= rate_hz and (best_hz is None or hz < best_hz):
+            best_hz = hz
+            best_code = code
+    if best_code is None:
+        best_code = max(DATA_RATE_PRESETS.values())
+    return best_code
+
+
+def _snap_pow2(n):
+    """Nearest power of two to n (minimum 2), for the FFT window size."""
+    if n <= 2:
+        return 2
+    lower = 1
+    while lower * 2 <= n:
+        lower *= 2
+    upper = lower * 2
+    return upper if (n - lower) < (upper - n) else lower
 
 
 def _validate_data_rate(value):
@@ -138,6 +170,16 @@ CONFIG_SCHEMA = (
             cv.Optional("offset_x", default=0): cv.int_range(-128, 127),
             cv.Optional("offset_y", default=0): cv.int_range(-128, 127),
             cv.Optional("offset_z", default=0): cv.int_range(-128, 127),
+            cv.Optional(CONF_VIBRATION): cv.Schema(
+                {
+                    cv.Optional("axis", default="y"): cv.enum(
+                        {"x": "x", "y": "y", "z": "z"}, lower=True
+                    ),
+                    cv.Optional("sample_rate", default=1000): cv.int_range(100, 1000),
+                    cv.Optional("window", default="2s"): cv.positive_time_period,
+                    cv.Optional("min_frequency", default=1.0): cv.positive_float,
+                }
+            ),
         }
     )
     .extend(cv.polling_component_schema("100ms"))
@@ -187,3 +229,15 @@ async def to_code(config):
     cg.add(var.set_offset_x(config["offset_x"]))
     cg.add(var.set_offset_y(config["offset_y"]))
     cg.add(var.set_offset_z(config["offset_z"]))
+
+    # Vibration analysis: override the ODR and poll rate for ~1 kHz sampling
+    # and hand the FFT window parameters to the driver.
+    if CONF_VIBRATION in config:
+        vib = config[CONF_VIBRATION]
+        sample_rate = float(vib["sample_rate"])
+        window_s = vib["window"].total_nanoseconds / 1e9
+        window_samples = _snap_pow2(int(window_s * sample_rate))
+        axis_idx = {"x": 0, "y": 1, "z": 2}[vib["axis"]]
+        cg.add(var.set_data_rate_code(_odr_code_for(sample_rate)))
+        cg.add(var.enable_vibration(axis_idx, window_samples, float(vib["min_frequency"]), sample_rate))
+        cg.add(var.set_update_interval(max(1, int(1000 / sample_rate))))

@@ -36,6 +36,7 @@ logger:
 i2c:
   sda: GPIO6    # XIAO D4 -> SDA
   scl: GPIO7    # XIAO D5 -> SCL
+  frequency: 400 kHz
 
 # The ADXL345 component (fixed I2C address 0x53).
 adxl345:
@@ -45,6 +46,13 @@ adxl345:
   range: 4 g          # full-scale range (DATA_FORMAT range bits)
   full_resolution: true
   low_power: false
+  # Vibration analysis: FFT of the Y axis, reporting the dominant frequency,
+  # its amplitude, and the resulting deflection. Requires a 400 kHz I2C bus.
+  vibration:
+    axis: y
+    sample_rate: 1000
+    window: 2s
+    min_frequency: 1
 
 # -----------------------------------------------------------------------------
 # Acceleration sensors (in g).
@@ -91,6 +99,25 @@ sensor:
     axis: tilt_z
     adxl345_id: adxl345_sensor
     id: tilt_z
+
+  # Vibration analysis (FFT of the Y axis).
+  - platform: adxl345
+    name: "ADXL345 Vibration Frequency"
+    axis: vibration_frequency
+    adxl345_id: adxl345_sensor
+    id: vib_freq
+
+  - platform: adxl345
+    name: "ADXL345 Vibration Amplitude"
+    axis: vibration_amplitude
+    adxl345_id: adxl345_sensor
+    id: vib_amp
+
+  - platform: adxl345
+    name: "ADXL345 Vibration Deflection"
+    axis: vibration_deflection
+    adxl345_id: adxl345_sensor
+    id: vib_defl
 
 # -----------------------------------------------------------------------------
 # Event / interrupt binary sensors.

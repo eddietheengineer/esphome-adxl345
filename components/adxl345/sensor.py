@@ -27,13 +27,25 @@ CONF_PARENT_ID = "adxl345_id"
 # Tilt axes report an angle in degrees; the acceleration axes report g.
 TILT_AXES = {"tilt_x", "tilt_y", "tilt_z"}
 
+# Vibration-analysis axes and their units.
+VIBRATION_UNITS = {
+    "vibration_frequency": "Hz",
+    "vibration_amplitude": "g",
+    "vibration_deflection": "mm",
+}
+
 
 def _default_unit(config):
-    """Default the unit to degrees for tilt axes and g for acceleration axes."""
+    """Default the unit per axis: degrees for tilt, g for acceleration, and
+    Hz / g / mm for the vibration-analysis outputs."""
     if "unit_of_measurement" not in config:
-        config["unit_of_measurement"] = (
-            UNIT_DEGREES if config[CONF_AXIS] in TILT_AXES else UNIT_G
-        )
+        axis = config[CONF_AXIS]
+        if axis in VIBRATION_UNITS:
+            config["unit_of_measurement"] = VIBRATION_UNITS[axis]
+        elif axis in TILT_AXES:
+            config["unit_of_measurement"] = UNIT_DEGREES
+        else:
+            config["unit_of_measurement"] = UNIT_G
     return config
 CONFIG_SCHEMA = cv.All(
     cv.Schema(
@@ -49,6 +61,9 @@ CONFIG_SCHEMA = cv.All(
                     "tilt_x": "tilt_x",
                     "tilt_y": "tilt_y",
                     "tilt_z": "tilt_z",
+                    "vibration_frequency": "vibration_frequency",
+                    "vibration_amplitude": "vibration_amplitude",
+                    "vibration_deflection": "vibration_deflection",
                 },
                 lower=True,
             ),
@@ -92,3 +107,9 @@ async def to_code(config):
         cg.add(cg.RawExpression(f"{parent}->set_tilt_y_callback([&](float val) {{ {var}->publish_state(val); }});"))
     elif axis == "tilt_z":
         cg.add(cg.RawExpression(f"{parent}->set_tilt_z_callback([&](float val) {{ {var}->publish_state(val); }});"))
+    elif axis == "vibration_frequency":
+        cg.add(cg.RawExpression(f"{parent}->set_vibration_frequency_callback([&](float val) {{ {var}->publish_state(val); }});"))
+    elif axis == "vibration_amplitude":
+        cg.add(cg.RawExpression(f"{parent}->set_vibration_amplitude_callback([&](float val) {{ {var}->publish_state(val); }});"))
+    elif axis == "vibration_deflection":
+        cg.add(cg.RawExpression(f"{parent}->set_vibration_deflection_callback([&](float val) {{ {var}->publish_state(val); }});"))

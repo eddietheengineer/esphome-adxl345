@@ -18,6 +18,7 @@ external_components:
 i2c:
   sda: ${sda}
   scl: ${scl}
+  frequency: 400 kHz
 
 adxl345:
   id: adxl345_sensor
@@ -42,6 +43,13 @@ adxl345:
   offset_x: 0
   offset_y: 0
   offset_z: 0
+  # Vibration analysis: FFT of the Y axis, reporting the dominant frequency,
+  # its amplitude, and the resulting deflection. Requires a 400 kHz I2C bus.
+  vibration:
+    axis: y
+    sample_rate: 1000
+    window: 2s
+    min_frequency: 1
 
 sensor:
   - platform: adxl345
@@ -85,6 +93,25 @@ sensor:
     axis: tilt_z
     adxl345_id: adxl345_sensor
     id: tilt_z
+
+  # Vibration analysis (FFT of the Y axis).
+  - platform: adxl345
+    name: "ADXL345 Vibration Frequency"
+    axis: vibration_frequency
+    adxl345_id: adxl345_sensor
+    id: vib_freq
+
+  - platform: adxl345
+    name: "ADXL345 Vibration Amplitude"
+    axis: vibration_amplitude
+    adxl345_id: adxl345_sensor
+    id: vib_amp
+
+  - platform: adxl345
+    name: "ADXL345 Vibration Deflection"
+    axis: vibration_deflection
+    adxl345_id: adxl345_sensor
+    id: vib_defl
 
 binary_sensor:
   - platform: adxl345

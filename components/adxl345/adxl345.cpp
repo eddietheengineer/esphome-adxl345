@@ -91,6 +91,17 @@ void ADXL345::setup() {
   }
   ESP_LOGD(TAG, "ADXL345 detected (DEVID=0x%02X)", devid);
 
+  // If vibration analysis is enabled, start the sampling-window clock and the
+  // slow-publish clock now.
+  if (this->vibration_enabled_) {
+    this->window_start_us_ = micros();
+    this->last_slow_us_ = micros();
+    this->vib_idx_ = 0;
+    this->vib_count_ = 0;
+    ESP_LOGD(TAG, "Vibration analysis: axis=%d, window=%d samples, min_freq=%.1f Hz, sample_rate=%.0f Hz",
+             this->vib_axis_, this->vib_window_, this->min_frequency_, this->fs_nominal_);
+  }
+
   // Configure the data format register.
   uint8_t data_format = 0x00;
   if (this->full_res_)
@@ -187,6 +198,32 @@ void ADXL345::update() {
   this->y_g_ = this->raw_to_g(y);
   this->z_g_ = this->raw_to_g(z);
 
+  // Fast path: append the configured axis to the FFT ring buffer. When the
+  // window fills, run the FFT and publish the vibration peak.
+  if (this->vibration_enabled_) {
+    const float sample = (this->vib_axis_ == 0) ? this->x_g_ : (this->vib_axis_ == 1) ? this->y_g_ : this->z_g_;
+    if (this->vib_count_ == 0)
+      this->window_start_us_ = micros();
+    this->vib_buf_[this->vib_idx_] = sample;
+    this->vib_idx_ = (this->vib_idx_ + 1) % static_cast<size_t>(this->vib_window_);
+    if (++this->vib_count_ == static_cast<size_t>(this->vib_window_)) {
+      const uint32_t duration_us = micros() - this->window_start_us_;
+      if (duration_us > 0)
+        this->fs_actual_ = static_cast<float>(this->vib_window_) * 1e6f / static_cast<float>(duration_us);
+      this->run_vibration_analysis();
+      this->vib_count_ = 0;
+    }
+  }
+
+  // Slow path: publish the regular sensors and read the interrupt / FIFO
+  // registers. While vibration analysis is active the update() loop runs at
+  // ~1 kHz, so this work is throttled to SLOW_PERIOD_US (10 Hz) to avoid
+  // flooding Home Assistant. When vibration is off, update() already runs at
+  // the (slower) configured interval, so this runs on every call.
+  const uint32_t now = micros();
+  if (this->vibration_enabled_ && now - this->last_slow_us_ < SLOW_PERIOD_US)
+    return;
+  this->last_slow_us_ = now;
   // Fire the acceleration callbacks.
   if (this->x_callback_)
     this->x_callback_(this->x_g_);
@@ -274,6 +311,82 @@ bool ADXL345::run_self_test() {
                            std::abs(this->raw_to_g(z))});
   ESP_LOGD(TAG, "Self-test shift: %.3f g", shift);
   return shift > 0.05f;  // a non-trivial shift indicates a healthy sensor
+}
+
+// ---------------------------------------------------------------------------
+// Vibration analysis.
+// ---------------------------------------------------------------------------
+void ADXL345::run_vibration_analysis() {
+  const int n = this->vib_window_;
+  if (n < 2)
+    return;
+
+  // Copy the window into the FFT buffer and remove the DC offset (the static
+  // gravity / bias component) so it doesn't swamp the spectrum.
+  float mean = 0.0f;
+  for (int i = 0; i < n; i++)
+    mean += this->vib_buf_[i];
+  mean /= static_cast<float>(n);
+  for (int i = 0; i < n; i++)
+    this->fft_buf_[i] = std::complex<float>(this->vib_buf_[i] - mean, 0.0f);
+
+  // In-place FFT.
+  fft_radix2(this->fft_buf_.data(), n);
+
+  // Search for the strongest spectral bin from min_frequency up to Nyquist.
+  const float fs = this->fs_actual_;
+  const int min_bin = std::max(1, static_cast<int>(std::ceil(this->min_frequency_ / (fs / static_cast<float>(n)))));
+  int peak_bin = -1;
+  float peak_mag = 0.0f;
+  for (int k = min_bin; k <= n / 2; k++) {
+    const float mag = std::abs(this->fft_buf_[k]);
+    if (mag > peak_mag) {
+      peak_mag = mag;
+      peak_bin = k;
+    }
+  }
+  if (peak_bin < 0)
+    return;
+
+  const float freq = static_cast<float>(peak_bin) * fs / static_cast<float>(n);
+  const float amp_g = 2.0f * peak_mag / static_cast<float>(n);
+  // Harmonic deflection: x = a / omega^2, with a in m/s^2 and omega in rad/s.
+  const float omega = 2.0f * 3.14159265f * freq;
+  const float defl_mm = (omega > 0.0f) ? amp_g * 9.80665f / (omega * omega) * 1000.0f : 0.0f;
+
+  if (this->vib_freq_callback_)
+    this->vib_freq_callback_(freq);
+  if (this->vib_amp_callback_)
+    this->vib_amp_callback_(amp_g);
+  if (this->vib_defl_callback_)
+    this->vib_defl_callback_(defl_mm);
+}
+
+void ADXL345::fft_radix2(std::complex<float> *a, int n) {
+  // Bit-reversal permutation.
+  for (int i = 1, j = 0; i < n; i++) {
+    int bit = n >> 1;
+    for (; j & bit; bit >>= 1)
+      j ^= bit;
+    j ^= bit;
+    if (i < j)
+      std::swap(a[i], a[j]);
+  }
+  // Butterfly stages.
+  for (int len = 2; len <= n; len <<= 1) {
+    const float ang = -2.0f * 3.14159265f / static_cast<float>(len);
+    const std::complex<float> wlen(std::cos(ang), std::sin(ang));
+    for (int i = 0; i < n; i += len) {
+      std::complex<float> w(1.0f, 0.0f);
+      for (int j = 0; j < len / 2; j++) {
+        const std::complex<float> u = a[i + j];
+        const std::complex<float> v = a[i + j + len / 2] * w;
+        a[i + j] = u + v;
+        a[i + j + len / 2] = u - v;
+        w = w * wlen;
+      }
+    }
+  }
 }
 
 }  // namespace adxl345
