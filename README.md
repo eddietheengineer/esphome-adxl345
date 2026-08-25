@@ -179,6 +179,12 @@ sensor:
     adxl345_id: adxl345_sensor
     id: vib_defl
 
+  - platform: adxl345
+    name: "ADXL345 Vibration Peak"
+    axis: vibration_peak
+    adxl345_id: adxl345_sensor
+    id: vib_peak
+
 # Event / interrupt binary sensors.
 #
 # To enable tap / activity / inactivity / free-fall detection, set the
