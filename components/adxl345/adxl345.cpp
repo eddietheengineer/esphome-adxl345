@@ -385,8 +385,13 @@ void ADXL345::dump_vibration_window() {
   if (n < 2)
     return;
   ESP_LOGI(TAG, "### VIBRATION DUMP: %d samples @ %.1f Hz (index,g) ###", n, this->fs_actual_);
-  for (int i = 0; i < n; i++)
+  for (int i = 0; i < n; i++) {
     ESP_LOGI(TAG, "%d,%.6f", i, this->vib_buf_[i]);
+    // Yield to the logger task so the serial buffer drains between lines.
+    // Without this, 1024 back-to-back ESP_LOGI calls starve the logger and
+    // the dump stalls/drops after a few dozen lines.
+    delay(2);
+  }
   ESP_LOGI(TAG, "### END VIBRATION DUMP ###");
 }
 
