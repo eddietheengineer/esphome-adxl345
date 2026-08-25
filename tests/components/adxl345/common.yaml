@@ -50,6 +50,7 @@ adxl345:
     sample_rate: 1000
     window: 2s
     min_frequency: 1
+    # dump_csv: true   # log the raw window to the serial console as CSV (index,g) each fill
 
 sensor:
   - platform: adxl345

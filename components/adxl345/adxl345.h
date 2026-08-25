@@ -139,6 +139,7 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   void set_vibration_amplitude_callback(std::function<void(float)> &&f) { this->vib_amp_callback_ = std::move(f); }
   void set_vibration_deflection_callback(std::function<void(float)> &&f) { this->vib_defl_callback_ = std::move(f); }
   void set_vibration_peak_callback(std::function<void(float)> &&f) { this->vib_peak_callback_ = std::move(f); }
+  void set_dump_csv(bool dump) { this->dump_csv_ = dump; }
   void enable_vibration(int axis, int window_samples, float min_frequency, float sample_rate) {
     this->vibration_enabled_ = true;
     this->vib_axis_ = axis;
@@ -195,6 +196,7 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   // Vibration analysis: run the FFT over the filled window and publish the
   // dominant frequency / amplitude / deflection.
   void run_vibration_analysis();
+  void dump_vibration_window();
   // In-place iterative radix-2 Cooley-Tukey FFT (n must be a power of two).
   static void fft_radix2(std::complex<float> *a, int n);
 
@@ -241,6 +243,7 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   // update() loop runs at ~1 kHz, so the regular publish + interrupt work is
   // throttled to SLOW_PERIOD_US.
   bool vibration_enabled_{false};
+  bool dump_csv_{false};  // log the raw window to the serial console each fill
   int vib_axis_{1};            // 0 = x, 1 = y, 2 = z
   int vib_window_{2048};      // FFT size (power of two)
   float min_frequency_{1.0f};  // Hz; ignore spectral bins below this

@@ -178,6 +178,7 @@ CONFIG_SCHEMA = (
                     cv.Optional("sample_rate", default=1000): cv.int_range(100, 1000),
                     cv.Optional("window", default="2s"): cv.positive_time_period,
                     cv.Optional("min_frequency", default=1.0): cv.positive_float,
+                    cv.Optional("dump_csv", default=False): cv.boolean,
                 }
             ),
         }
@@ -240,4 +241,5 @@ async def to_code(config):
         axis_idx = {"x": 0, "y": 1, "z": 2}[vib["axis"]]
         cg.add(var.set_data_rate_code(_odr_code_for(sample_rate)))
         cg.add(var.enable_vibration(axis_idx, window_samples, float(vib["min_frequency"]), sample_rate))
+        cg.add(var.set_dump_csv(vib["dump_csv"]))
         cg.add(var.set_update_interval(max(1, int(1000 / sample_rate))))

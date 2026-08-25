@@ -372,6 +372,21 @@ void ADXL345::run_vibration_analysis() {
     this->vib_amp_callback_(amp_g);
   if (this->vib_defl_callback_)
     this->vib_defl_callback_(defl_mm);
+
+  // Optionally dump the raw window to the serial console as CSV (index,g)
+  // so it can be copied out and analyzed offline.
+  if (this->dump_csv_)
+    this->dump_vibration_window();
+}
+
+void ADXL345::dump_vibration_window() {
+  const int n = this->vib_window_;
+  if (n < 2)
+    return;
+  ESP_LOGI(TAG, "### VIBRATION DUMP: %d samples @ %.1f Hz (index,g) ###", n, this->fs_actual_);
+  for (int i = 0; i < n; i++)
+    ESP_LOGI(TAG, "%d,%.6f", i, this->vib_buf_[i]);
+  ESP_LOGI(TAG, "### END VIBRATION DUMP ###");
 }
 
 void ADXL345::fft_radix2(std::complex<float> *a, int n) {
