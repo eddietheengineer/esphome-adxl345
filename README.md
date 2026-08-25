@@ -1,6 +1,6 @@
 # ADXL345 ESPHome External Component
 
-A 3-axis accelerometer driver for the [Analog Devices ADXL345](https://www.analog.com/en/products/adxl345.html), connected via **I2C**. Exposes X/Y/Z acceleration, vector magnitude, tilt angles, vibration analysis (dominant frequency, amplitude, deflection), and interrupt events (tap, double-tap, activity, inactivity, free-fall) as Home Assistant sensors.
+A 3-axis accelerometer driver for the [Analog Devices ADXL345](https://www.analog.com/en/products/adxl345.html), connected via **I2C**. Exposes X/Y/Z acceleration, vector magnitude, tilt angles, vibration analysis (dominant frequency, amplitude, deflection, peak), and interrupt events (tap, double-tap, activity, inactivity, free-fall) as Home Assistant sensors.
 
 ## Hardware
 
@@ -270,7 +270,8 @@ binary_sensor:
 ### `vibration` block
 
 The optional `vibration:` sub-block runs an on-device FFT on one axis and
-exposes the dominant frequency, its amplitude, and the resulting deflection.
+exposes the dominant frequency, its amplitude, the resulting deflection, and
+the peak absolute amplitude over the window.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
@@ -283,7 +284,7 @@ exposes the dominant frequency, its amplitude, and the resulting deflection.
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `axis` | enum | `x`, `y`, `z`, `magnitude` (acceleration in g), `tilt_x`, `tilt_y`, `tilt_z` (tilt in degrees), or `vibration_frequency` (Hz), `vibration_amplitude` (g), `vibration_deflection` (mm). |
+| `axis` | enum | `x`, `y`, `z`, `magnitude` (acceleration in g), `tilt_x`, `tilt_y`, `tilt_z` (tilt in degrees), or `vibration_frequency` (Hz), `vibration_amplitude` (g), `vibration_deflection` (mm), `vibration_peak` (g). |
 | `adxl345_id` | id | Reference to the `adxl345` component. |
 
 ### `binary_sensor` platform
@@ -300,6 +301,7 @@ exposes the dominant frequency, its amplitude, and the resulting deflection.
 - Tilt angles are computed from the static gravity vector using `atan2`.
 - The `INT_SOURCE` register (0x30) is polled each cycle; the tap, double-tap, activity, inactivity, and free-fall bits are reported as the current on/off level of the corresponding binary sensors (data-ready is reported whenever it is set).
 - With `vibration:` enabled, the driver samples the chosen axis at up to 1 kHz, accumulates a window of samples, and runs a radix-2 FFT on the main loop. The strongest spectral bin (above `min_frequency`) is reported as the dominant frequency, its amplitude (in g), and the resulting deflection (in mm).
+- The `vibration_peak` sensor reports the maximum absolute deviation from the mean over the same window (a time-domain peak in g) — a "how hard did it shake" number that is independent of frequency.
 
 ## Troubleshooting
 

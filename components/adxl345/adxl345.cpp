@@ -327,6 +327,18 @@ void ADXL345::run_vibration_analysis() {
   for (int i = 0; i < n; i++)
     mean += this->vib_buf_[i];
   mean /= static_cast<float>(n);
+
+  // Peak absolute amplitude: the maximum deviation from the mean over the
+  // window (a time-domain peak, in g). Published once per window, alongside
+  // the FFT results.
+  float peak = 0.0f;
+  for (int i = 0; i < n; i++) {
+    const float d = std::abs(this->vib_buf_[i] - mean);
+    if (d > peak)
+      peak = d;
+  }
+  if (this->vib_peak_callback_)
+    this->vib_peak_callback_(peak);
   for (int i = 0; i < n; i++)
     this->fft_buf_[i] = std::complex<float>(this->vib_buf_[i] - mean, 0.0f);
 

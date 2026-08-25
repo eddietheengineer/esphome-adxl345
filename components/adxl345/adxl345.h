@@ -138,6 +138,7 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   void set_vibration_frequency_callback(std::function<void(float)> &&f) { this->vib_freq_callback_ = std::move(f); }
   void set_vibration_amplitude_callback(std::function<void(float)> &&f) { this->vib_amp_callback_ = std::move(f); }
   void set_vibration_deflection_callback(std::function<void(float)> &&f) { this->vib_defl_callback_ = std::move(f); }
+  void set_vibration_peak_callback(std::function<void(float)> &&f) { this->vib_peak_callback_ = std::move(f); }
   void enable_vibration(int axis, int window_samples, float min_frequency, float sample_rate) {
     this->vibration_enabled_ = true;
     this->vib_axis_ = axis;
@@ -270,6 +271,7 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   std::function<void(float)> vib_freq_callback_;
   std::function<void(float)> vib_amp_callback_;
   std::function<void(float)> vib_defl_callback_;
+  std::function<void(float)> vib_peak_callback_;
 };
 
 }  // namespace adxl345

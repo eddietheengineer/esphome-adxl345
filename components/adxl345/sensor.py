@@ -32,6 +32,7 @@ VIBRATION_UNITS = {
     "vibration_frequency": "Hz",
     "vibration_amplitude": "g",
     "vibration_deflection": "mm",
+    "vibration_peak": "g",
 }
 
 
@@ -64,6 +65,7 @@ CONFIG_SCHEMA = cv.All(
                     "vibration_frequency": "vibration_frequency",
                     "vibration_amplitude": "vibration_amplitude",
                     "vibration_deflection": "vibration_deflection",
+                    "vibration_peak": "vibration_peak",
                 },
                 lower=True,
             ),
@@ -113,3 +115,5 @@ async def to_code(config):
         cg.add(cg.RawExpression(f"{parent}->set_vibration_amplitude_callback([&](float val) {{ {var}->publish_state(val); }});"))
     elif axis == "vibration_deflection":
         cg.add(cg.RawExpression(f"{parent}->set_vibration_deflection_callback([&](float val) {{ {var}->publish_state(val); }});"))
+    elif axis == "vibration_peak":
+        cg.add(cg.RawExpression(f"{parent}->set_vibration_peak_callback([&](float val) {{ {var}->publish_state(val); }});"))
