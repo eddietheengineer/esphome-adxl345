@@ -9,6 +9,7 @@
 #include "esphome/core/hal.h"
 #include "esphome/core/automation.h"
 #include "esphome/components/i2c/i2c.h"
+#include "esphome/components/button/button.h"
 
 namespace esphome {
 namespace adxl345 {
@@ -139,7 +140,7 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   void set_vibration_amplitude_callback(std::function<void(float)> &&f) { this->vib_amp_callback_ = std::move(f); }
   void set_vibration_deflection_callback(std::function<void(float)> &&f) { this->vib_defl_callback_ = std::move(f); }
   void set_vibration_peak_callback(std::function<void(float)> &&f) { this->vib_peak_callback_ = std::move(f); }
-  void set_dump_csv(bool dump) { this->dump_csv_ = dump; }
+  void request_dump() { this->dump_pending_ = true; }
   void enable_vibration(int axis, int window_samples, float min_frequency, float sample_rate) {
     this->vibration_enabled_ = true;
     this->vib_axis_ = axis;
@@ -243,7 +244,7 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   // update() loop runs at ~1 kHz, so the regular publish + interrupt work is
   // throttled to SLOW_PERIOD_US.
   bool vibration_enabled_{false};
-  bool dump_csv_{false};  // log the raw window to the serial console each fill
+  bool dump_pending_{false};  // armed by the dump button; dump the next filled window once
   int vib_axis_{1};            // 0 = x, 1 = y, 2 = z
   int vib_window_{2048};      // FFT size (power of two)
   float min_frequency_{1.0f};  // Hz; ignore spectral bins below this
@@ -275,6 +276,18 @@ class ADXL345 : public PollingComponent, public i2c::I2CDevice {
   std::function<void(float)> vib_amp_callback_;
   std::function<void(float)> vib_defl_callback_;
   std::function<void(float)> vib_peak_callback_;
+};
+
+// ---------------------------------------------------------------------------
+// Button platform: pressing it arms a one-shot dump of the next filled
+// vibration window to the serial console (see dump_vibration_window()).
+// ---------------------------------------------------------------------------
+class DumpButton : public button::Button {
+ public:
+  void set_parent(ADXL345 *parent) { this->parent_ = parent; }
+  void press_action() override { this->parent_->request_dump(); }
+ protected:
+  ADXL345 *parent_{nullptr};
 };
 
 }  // namespace adxl345

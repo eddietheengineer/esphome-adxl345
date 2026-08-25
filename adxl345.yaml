@@ -53,7 +53,6 @@ adxl345:
     sample_rate: 1000
     window: 2s
     min_frequency: 1
-    # dump_csv: true   # log the raw window to the serial console as CSV (index,g) each fill
 
 # -----------------------------------------------------------------------------
 # Acceleration sensors (in g).
@@ -172,4 +171,13 @@ binary_sensor:
   - platform: adxl345
     name: "ADXL345 Free Fall"
     source: free_fall
+    adxl345_id: adxl345_sensor
+
+# -----------------------------------------------------------------------------
+# On-demand raw-data dump. Pressing this button logs the next filled
+# vibration window to the serial console as CSV (index,g per line) between
+# ### VIBRATION DUMP ### markers, for copying out and analyzing offline.
+button:
+  - platform: adxl345
+    name: "ADXL345 Dump Vibration"
     adxl345_id: adxl345_sensor

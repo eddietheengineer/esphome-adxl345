@@ -373,10 +373,11 @@ void ADXL345::run_vibration_analysis() {
   if (this->vib_defl_callback_)
     this->vib_defl_callback_(defl_mm);
 
-  // Optionally dump the raw window to the serial console as CSV (index,g)
-  // so it can be copied out and analyzed offline.
-  if (this->dump_csv_)
+  // If the dump button was pressed, dump the raw window once and disarm.
+  if (this->dump_pending_) {
+    this->dump_pending_ = false;
     this->dump_vibration_window();
+  }
 }
 
 void ADXL345::dump_vibration_window() {

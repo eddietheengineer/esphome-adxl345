@@ -285,7 +285,6 @@ the peak absolute amplitude over the window.
 | `sample_rate` | int | `1000` | Sampling rate in Hz (100–1000); sets the ODR and poll rate. |
 | `window` | time period | `2s` | FFT window length (e.g. `2s`, `500ms`). |
 | `min_frequency` | float | `1` | Lowest frequency to report, in Hz. |
-| `dump_csv` | bool | `false` | When `true`, log the raw window to the serial console as CSV (`index,g` per line) each time it fills, for copying out and analyzing offline. |
 
 ### `sensor` platform
 
@@ -301,6 +300,15 @@ the peak absolute amplitude over the window.
 | `source` | enum | `data_ready`, `single_tap`, `double_tap`, `activity`, `inactivity`, `free_fall`. |
 | `adxl345_id` | id | Reference to the `adxl345` component. |
 
+### `button` platform
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `name` | string | Name of the button entity in Home Assistant. |
+| `adxl345_id` | id | Reference to the `adxl345` component. |
+
+Pressing the button arms a one-shot dump of the next filled vibration window to the serial console.
+
 ## How it works
 
 - The driver polls the ADXL345's six data registers (0x32–0x37) in a single I2C burst read on every `update_interval` (default 100 ms).
@@ -309,7 +317,7 @@ the peak absolute amplitude over the window.
 - The `INT_SOURCE` register (0x30) is polled each cycle; the tap, double-tap, activity, inactivity, and free-fall bits are reported as the current on/off level of the corresponding binary sensors (data-ready is reported whenever it is set).
 - With `vibration:` enabled, the driver samples the chosen axis at up to 1 kHz, accumulates a window of samples, and runs a radix-2 FFT on the main loop. The strongest spectral bin (above `min_frequency`) is reported as the dominant frequency, its amplitude (in g), and the resulting deflection (in mm).
 - The `vibration_peak` sensor reports the maximum absolute deviation from the mean over the same window (a time-domain peak in g) — a "how hard did it shake" number that is independent of frequency.
-- With `dump_csv: true`, each filled window is also printed to the serial console as CSV (`index,g` per line, between `### VIBRATION DUMP ###` markers). Copy that block, strip the `[time][I][adxl345]: ` log prefix, and you have a clean `.csv` of the raw samples.
+- The `adxl345` button platform exposes a Home Assistant button. Pressing it arms a one-shot dump: the next filled vibration window is printed to the serial console as CSV (`index,g` per line, between `### VIBRATION DUMP ###` markers). Copy that block, strip the `[time][I][adxl345]: ` log prefix, and you have a clean `.csv` of the raw samples.
 
 ## Troubleshooting
 
